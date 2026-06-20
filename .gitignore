@@ -1,0 +1,13 @@
+# build output
+/build/
+**/build32/
+.vs/
+*.obj
+*.ilk
+*.exp
+*.lib
+*.pdb
+
+# server runtime data/logs (generated next to mqelserver.exe)
+**/Plugins/
+*.log
