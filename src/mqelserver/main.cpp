@@ -65,18 +65,27 @@ static void DrainTo(SOCKET cs, size_t sid)
 static void HandleConnection(SOCKET cs)
 {
     size_t sid = (size_t)cs;
-    { std::lock_guard<std::mutex> lk(g_lock); g_gs->onConnect(sid, 443); }
-    char buf[16384];
-    for (;;)
+    // Guard the whole connection: a fault in the TLS/stream/dispatch path (e.g.
+    // the client dropping mid-request on logout) must only drop THIS connection,
+    // never take down the server for everyone. With /EHa this also traps SEH
+    // faults (access violations), so a single bad connection can't crash us.
+    try
     {
-        int n = recv(cs, buf, sizeof(buf), 0);
-        if (n <= 0) break;
-        std::lock_guard<std::mutex> lk(g_lock);
-        g_gs->Current = sid;
-        g_gs->onStreamwrite(sid, buf, (uint32_t)n);  // TLS + HTTP parse + dispatch
-        DrainTo(cs, sid);
+        { std::lock_guard<std::mutex> lk(g_lock); g_gs->onConnect(sid, 443); }
+        char buf[16384];
+        for (;;)
+        {
+            int n = recv(cs, buf, sizeof(buf), 0);
+            if (n <= 0) break;
+            std::lock_guard<std::mutex> lk(g_lock);
+            g_gs->Current = sid;
+            g_gs->onStreamwrite(sid, buf, (uint32_t)n);  // TLS + HTTP parse + dispatch
+            DrainTo(cs, sid);
+        }
+        { std::lock_guard<std::mutex> lk(g_lock); g_gs->onDisconnect(sid); }
     }
-    { std::lock_guard<std::mutex> lk(g_lock); g_gs->onDisconnect(sid); }
+    catch (const std::exception &e) { LOG("connection %u dropped (error: %s)", (unsigned)sid, e.what()); }
+    catch (...)                     { LOG("connection %u dropped (unknown fault)", (unsigned)sid); }
     closesocket(cs);
 }
 

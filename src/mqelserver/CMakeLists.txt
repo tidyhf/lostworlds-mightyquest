@@ -17,3 +17,6 @@ target_link_libraries(mqelserver PRIVATE ws2_32 OpenSSL::SSL OpenSSL::Crypto)
 target_compile_definitions(mqelserver PRIVATE
     _CRT_SECURE_NO_WARNINGS _WINSOCK_DEPRECATED_NO_WARNINGS WIN32_LEAN_AND_MEAN _WIN32_WINNT=0x0601)
 set_property(TARGET mqelserver PROPERTY MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")
+# /EHa so the per-connection try/catch in main.cpp also traps SEH faults (e.g.
+# access violations) - one bad connection drops itself instead of crashing the server.
+target_compile_options(mqelserver PRIVATE /EHa)
