@@ -39,7 +39,15 @@ MQEL_json GetCastle(uint64_t AccountID, eCastletype Type)
         Castle = Castle.substr(1, Castle.size() - 2);
         Insert = Insert.substr(1, Insert.size() - 2);
 
-        std::string Hackery = "{" + Insert + ", " + Castle + "}";
+        // Splice the fragments, keeping "$type" first and dropping any empty
+        // part so we never emit a stray comma. An empty castle (e.g. a bot or
+        // tutorial target with no stored data) used to produce invalid JSON,
+        // throwing in parse() and crashing the server on the first attack.
+        std::string Hackery;
+        if (Castle.find_first_not_of(" \t\r\n") == std::string::npos)
+            Hackery = "{" + Insert + "}";
+        else
+            Hackery = "{" + Insert + ", " + Castle + "}";
         return MQEL_json::parse(Hackery.c_str());
     }
 }
