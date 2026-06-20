@@ -61,49 +61,24 @@ void Sendreply(struct Gameserver *Server, std::string Result)
     Server->Send(0, Response);
 }
 
+// Look up and invoke the handler for a request. Handler exceptions are caught
+// here so a single malformed request can't take down the whole server (and so
+// the caller's stream-lock bookkeeping isn't skipped by a stray throw).
+static void Dispatch(Gameserver *Server, const char *Method, HTTPRequest &Request)
+{
+    Infoprint(va("%s: %s", Method, Request.URL.c_str()));
+    std::string Servicepath = Request.URL.substr(0, Request.URL.find_first_of('?'));
+
+    auto Service = Servicemap->find(Servicepath);
+    if (Service == Servicemap->end()) { Infoprint(va("  NO HANDLER for %s", Servicepath.c_str())); return; }
+
+    try { Service->second(Server, Request.URL, Request.Body); }
+    catch (std::exception &e) { Infoprint(va("  Handler for %s failed: %s", Servicepath.c_str(), e.what())); }
+}
+
 // Callbacks on parsed data.
-void Gameserver::onGET(const size_t Socket, HTTPRequest &Request)
-{
-    Infoprint(va("%s: %s", __FUNCTION__, Request.URL.c_str()));
-    std::string Servicepath = Request.URL.substr(0, Request.URL.find_first_of('?'));
-
-    auto Service = Servicemap->find(Servicepath);
-    if (Service == Servicemap->end()) Infoprint(va("  NO HANDLER for %s", Servicepath.c_str()));
-    else Service->second(this, Request.URL, Request.Body);
-};
-void Gameserver::onPUT(const size_t Socket, HTTPRequest &Request)
-{
-    Infoprint(va("%s: %s", __FUNCTION__, Request.URL.c_str()));
-    std::string Servicepath = Request.URL.substr(0, Request.URL.find_first_of('?'));
-
-    auto Service = Servicemap->find(Servicepath);
-    if (Service == Servicemap->end()) Infoprint(va("  NO HANDLER for %s", Servicepath.c_str()));
-    else Service->second(this, Request.URL, Request.Body);
-};
-void Gameserver::onPOST(const size_t Socket, HTTPRequest &Request)
-{
-    Infoprint(va("%s: %s", __FUNCTION__, Request.URL.c_str()));
-    std::string Servicepath = Request.URL.substr(0, Request.URL.find_first_of('?'));
-
-    auto Service = Servicemap->find(Servicepath);
-    if (Service == Servicemap->end()) Infoprint(va("  NO HANDLER for %s", Servicepath.c_str()));
-    else Service->second(this, Request.URL, Request.Body);
-};
-void Gameserver::onCOPY(const size_t Socket, HTTPRequest &Request)
-{
-    Infoprint(va("%s: %s", __FUNCTION__, Request.URL.c_str()));
-    std::string Servicepath = Request.URL.substr(0, Request.URL.find_first_of('?'));
-
-    auto Service = Servicemap->find(Servicepath);
-    if (Service == Servicemap->end()) Infoprint(va("  NO HANDLER for %s", Servicepath.c_str()));
-    else Service->second(this, Request.URL, Request.Body);
-};
-void Gameserver::onDELETE(const size_t Socket, HTTPRequest &Request)
-{
-    Infoprint(va("%s: %s", __FUNCTION__, Request.URL.c_str()));
-    std::string Servicepath = Request.URL.substr(0, Request.URL.find_first_of('?'));
-
-    auto Service = Servicemap->find(Servicepath);
-    if (Service == Servicemap->end()) Infoprint(va("  NO HANDLER for %s", Servicepath.c_str()));
-    else Service->second(this, Request.URL, Request.Body);
-};
+void Gameserver::onGET(const size_t Socket, HTTPRequest &Request)    { Dispatch(this, __FUNCTION__, Request); };
+void Gameserver::onPUT(const size_t Socket, HTTPRequest &Request)    { Dispatch(this, __FUNCTION__, Request); };
+void Gameserver::onPOST(const size_t Socket, HTTPRequest &Request)   { Dispatch(this, __FUNCTION__, Request); };
+void Gameserver::onCOPY(const size_t Socket, HTTPRequest &Request)   { Dispatch(this, __FUNCTION__, Request); };
+void Gameserver::onDELETE(const size_t Socket, HTTPRequest &Request) { Dispatch(this, __FUNCTION__, Request); };
